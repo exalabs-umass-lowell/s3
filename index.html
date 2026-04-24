@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>S3: Stable Subgoal Selection by Constraining Uncertainty of Coarse Dynamics in HRL</title>
+  <meta name="description" content="Project page for S3 — a dynamics-aware intrinsic reward for the high-level agent in Hierarchical Reinforcement Learning. ALA Workshop 2026.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,wght@0,400;0,600;1,400&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark/light mode">
+  <span class="theme-icon"></span>
+</button>
+
+<header class="hero">
+<h1>S3: Stable Subgoal Selection by Constraining Uncertainty of Coarse Dynamics in Hierarchical Reinforcement Learning</h1>
+
+  <ul class="authors">
+    <li><a href="#" class="author-link">Kshitij Kumar Srivastava</a><sup>1</sup></li>
+    <li><a href="https://scholar.google.com/citations?user=MYppaogAAAAJ" class="author-link" target="_blank" rel="noopener">Kshitij Jerath</a><sup>1</sup></li>
+  </ul>
+  <p class="affiliations"><sup>1</sup>University of Massachusetts, Lowell</p>
+
+  <nav class="actions">
+    <a class="btn" href="assets/s3_ala2026.pdf" target="_blank" rel="noopener">
+      <span class="btn-icon" aria-hidden="true">&#x1F4C4;</span> Paper
+    </a>
+    <a class="btn" href="#" target="_blank" rel="noopener" id="code-link">
+      <span class="btn-icon" aria-hidden="true">&lt;/&gt;</span> Code
+    </a>
+    <a class="btn" href="#bibtex">
+      <span class="btn-icon" aria-hidden="true">&#x270E;</span> BibTeX
+    </a>
+  </nav>
+</header>
+
+<main>
+
+  <section class="video-demos">
+    <div class="video-grid">
+      <figure class="video-fig">
+        <video src="assets/VID3.mp4" autoplay loop muted playsinline></video>
+        <figcaption>Ant Fall</figcaption>
+      </figure>
+      <figure class="video-fig">
+        <video src="assets/VID2.mp4" autoplay loop muted playsinline></video>
+        <figcaption>Ant Push</figcaption>
+      </figure>
+      <figure class="video-fig">
+        <video src="assets/VID1.mp4" autoplay loop muted playsinline></video>
+        <figcaption>Ant Maze</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section class="tldr">
+    <h2>TL;DR</h2>
+    <p>
+      Good managers assign tasks that can be executed reliably. HRL managers get sparse feedback, making goal
+      assignments suboptimal. We reward the manager for predictable coarse-grained worker dynamics, improving
+      behavior in irreversible, risky scenarios.
+    </p>
+  </section>
+
+  <section id="abstract">
+    <h2>Abstract</h2>
+    <p>
+      Hierarchical Reinforcement Learning (HRL) intends to separate strategic planning from primitive execution. It
+      has been widely successful in solving long-horizon and complex tasks, where flat-RL algorithms have difficulty
+      in learning. However, while the low-level agent in HRL benefits from dense feedback and abundant trial
+      opportunities, the high-level agent receives sparse, delayed feedback from the environment and its performance
+      depends on the low-level execution capability. In this paper, we study whether subgoal selection by the
+      high-level agent can be performed more strategically, by providing it with dynamics-aware intrinsic motivation.
+      Since motivation based on primitive transition dynamics would require broad coverage of the state-action space,
+      we propose to use <em>coarse dynamics</em>, i.e., environment transitions aggregated over multiple steps at the
+      temporal scale at which the high-level agent operates. This approach stabilizes the high-level policy by
+      learning to minimize the predictive uncertainty associated with the coarse dynamics, and provides a guided
+      structure for navigation. We model the predictive uncertainty by evaluating different dispersion metrics as
+      approximated by a Mixture Density Network (MDN). Empirically, we observe that a dense, dynamics-aware intrinsic
+      reward leads to risk-averse subgoal selection, enabling it to outperform state-of-the-art HRL methods in
+      non-stationary long-horizon environments.
+    </p>
+  </section>
+
+  <section id="contributions">
+    <h2>Key Contributions</h2>
+    <ol class="contribs">
+      <li>
+        <strong>Intrinsic motivation for the <em>high-level</em> policy.</strong>
+        Most HRL work shapes only the low-level reward; S3 instead delivers dense, dynamics-aware feedback to the
+        Manager, tackling the root cause of non-stationarity rather than its symptoms.
+      </li>
+      <li>
+        <strong>Coarse dynamics via a Mixture Density Network.</strong>
+        The MDN is trained jointly with the hierarchy on tuples <code>(s<sub>t</sub>, g<sub>t</sub>, s<sub>t+c</sub>)</code>,
+        capturing multi-modal, heteroscedastic outcomes that a deterministic predictor would blur.
+      </li>
+      <li>
+        <strong>Potential-based, policy-invariant shaping.</strong>
+        The intrinsic reward takes the form <code>r<sub>hi</sub><sup>int</sup> = &gamma;&Phi;<sub>t+c</sub> &minus; &Phi;<sub>t</sub></code>
+        with &Phi; set to a variance-based dispersion penalty &mdash; preserving the optimal policy by
+        the Ng&nbsp;et&nbsp;al. (1999) / Wiewiora&nbsp;et&nbsp;al. (2003) framework.
+      </li>
+      <li>
+        <strong>Strong empirical gains on bottleneck tasks.</strong>
+        S3 outperforms HIRO and HRAC on Ant&nbsp;Fall and Ant&nbsp;Push, and is robust across manager horizons
+        <em>c</em>&nbsp;&isin;&nbsp;{5, 10, 20, 50, 100}, with <em>c</em>&nbsp;=&nbsp;10 as the stability sweet spot.
+      </li>
+    </ol>
+  </section>
+
+  <section id="method">
+    <h2>Method</h2>
+    <p>
+      At each high-level step the Manager proposes a subgoal <em>g<sub>t</sub></em> and the Worker rolls out for
+      <em>c</em>&nbsp;steps to reach a terminal state <em>s<sub>t+c</sub></em>. An MDN predicts the conditional
+      distribution <em>p(s<sub>t+c</sub>&nbsp;|&nbsp;s<sub>t</sub>,&nbsp;g<sub>t</sub>)</em> as a mixture of Gaussians,
+      trained by supervised maximum likelihood on the realised triples. We take the total variance (trace of the
+      covariance) of this mixture as a potential <em>&Phi;(s,&nbsp;g)</em>, so that subgoals with diffuse, uncertain
+      outcomes are discouraged while predictably reachable ones are preferred. Because the intrinsic reward is the
+      discounted difference of potentials, it telescopes across episodes and leaves the optimal high-level policy
+      unchanged &mdash; but delivers the dense signal the Manager was previously missing. S3 sits on top of an existing
+      HRL backbone (we use HRAC) and only modifies the high-level reward term.
+    </p>
+    <div class="fig-row">
+      <figure style="grid-column: span 2;">
+        <img src="assets/arch.svg" alt="HRL framework with S3 implemented via MDN.">
+        <figcaption>Full HRL loop with S3 intrinsic reward.</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/s3_module.svg" alt="S3 module detail.">
+        <figcaption>S3 module detail.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section id="results">
+    <h2>Results</h2>
+
+    <div class="results-table-wrap">
+      <p class="table-caption"><strong>Table 1.</strong> Mean success rate (% episodes reaching the final goal) &plusmn; SEM over 5 random seeds, trained for 5M environment steps. <strong>Bold</strong> marks the best result per environment.</p>
+      <table class="results-table">
+        <thead>
+          <tr>
+            <th>Environment</th>
+            <th>S3 <em>(ours)</em></th>
+            <th>HIRO</th>
+            <th>HRAC</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Ant Fall</td>
+            <td class="best">0.374 <span class="sem">&plusmn; 0.054</span></td>
+            <td>0.059 <span class="sem">&plusmn; 0.059</span></td>
+            <td>0.000 <span class="sem">&plusmn; 0.000</span></td>
+          </tr>
+          <tr>
+            <td>Ant Push</td>
+            <td class="best">0.186 <span class="sem">&plusmn; 0.107</span></td>
+            <td>0.134 <span class="sem">&plusmn; 0.101</span></td>
+            <td>0.180 <span class="sem">&plusmn; 0.180</span></td>
+          </tr>
+          <tr>
+            <td>Ant Maze</td>
+            <td>0.827 <span class="sem">&plusmn; 0.024</span></td>
+            <td>0.790 <span class="sem">&plusmn; 0.067</span></td>
+            <td class="best">0.832 <span class="sem">&plusmn; 0.039</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="fig-row">
+      <figure>
+        <img src="assets/lc_antfall.svg" alt="Learning curve on Ant Fall.">
+        <figcaption>Ant Fall</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/lc_antpush.svg" alt="Learning curve on Ant Push.">
+        <figcaption>Ant Push</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/lc_antmaze.svg" alt="Learning curve on Ant Maze.">
+        <figcaption>Ant Maze</figcaption>
+      </figure>
+    </div>
+    <p class="fig-caption-shared"><strong>Figure 2.</strong> Success rate over 5M steps (mean &pm; 1 s.e.m. over 5 seeds). S3 (blue) clears Ant&nbsp;Fall where HIRO/HRAC stall near zero, and leads on Ant&nbsp;Push; Ant&nbsp;Maze is a near tie because geometric path-finding dominates over coarse-dynamics variance.</p>
+
+    <div class="fig-row">
+      <figure>
+        <img src="assets/scatter_1m.svg" alt="Terminal state scatter at 1M episodes.">
+        <figcaption>1M</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/scatter_2m.svg" alt="Terminal state scatter at 2M episodes.">
+        <figcaption>2M</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/scatter_3m.svg" alt="Terminal state scatter at 3M episodes.">
+        <figcaption>3M</figcaption>
+      </figure>
+    </div>
+    <div class="fig-row cols-2-center">
+      <figure>
+        <img src="assets/scatter_4m.svg" alt="Terminal state scatter at 4M episodes.">
+        <figcaption>4M</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/scatter_5m.svg" alt="Terminal state scatter at 5M episodes.">
+        <figcaption>5M</figcaption>
+      </figure>
+    </div>
+    <p class="fig-caption-shared"><strong>Figure 4.</strong> Worker terminal states <em>s<sub>t+c</sub></em> in Ant&nbsp;Push across training checkpoints (1M–5M episodes). The red quadrant is an irreversibly hazardous push direction. Over training the S3-shaped Manager progressively concentrates outcomes away from the hazardous region and closer to <em>g<sub>t</sub></em>.</p>
+
+    <div class="fig-row">
+      <figure>
+        <img src="assets/traj_antfall.svg" alt="Manager trajectories on Ant Fall.">
+        <figcaption>Ant Fall</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/traj_antpush.svg" alt="Manager trajectories on Ant Push.">
+        <figcaption>Ant Push</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/traj_antmaze.svg" alt="Manager trajectories on Ant Maze.">
+        <figcaption>Ant Maze</figcaption>
+      </figure>
+    </div>
+    <p class="fig-caption-shared"><strong>Figure 5.</strong> Manager-guided trajectories over 50 eval runs (S3 in blue, HRAC in green). S3 concentrates subgoals near the bridge region of Ant&nbsp;Fall and produces narrow, aligned corridors on Ant&nbsp;Maze; on Ant&nbsp;Push it re-plans around the block whenever the coarse-dynamics model flags high uncertainty.</p>
+  </section>
+
+  <section id="bibtex">
+    <h2>Citation</h2>
+    <div class="bibtex-wrap">
+      <button class="copy-btn" type="button" data-target="bibtex-src" aria-label="Copy BibTeX">Copy</button>
+      <pre id="bibtex-src"><code>@inproceedings{srivastava2026s3,
+  title     = {S3: Stable Subgoal Selection by Constraining Uncertainty of Coarse
+               Dynamics in Hierarchical Reinforcement Learning},
+  author    = {Srivastava, Kshitij Kumar and Jerath, Kshitij},
+  booktitle = {Adaptive and Learning Agents Workshop (ALA) at AAMAS},
+  year      = {2026}
+}</code></pre>
+    </div>
+  </section>
+
+  <section id="ack">
+    <h2>Acknowledgments</h2>
+    <p class="muted-text">
+      This research has been funded by the Office of Naval Research
+      (N00014-23-1-2744 and N00014-24-1-2634).
+    </p>
+  </section>
+
+</main>
+
+<footer>
+  <p class="fine">University of Massachusetts, Lowell</p>
+</footer>
+
+<script>
+  (function () {
+    const root = document.documentElement;
+    const btn = document.getElementById('theme-toggle');
+    const stored = localStorage.getItem('theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const initial = stored || (prefersDark ? 'dark' : 'light');
+    root.setAttribute('data-theme', initial);
+
+    function updateIcon(theme) {
+      btn.querySelector('.theme-icon').textContent = theme === 'dark' ? '☀' : '☾';
+    }
+    updateIcon(initial);
+
+    btn.addEventListener('click', () => {
+      const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      root.setAttribute('data-theme', next);
+      localStorage.setItem('theme', next);
+      updateIcon(next);
+    });
+  })();
+
+  document.querySelectorAll('.copy-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const el = document.getElementById(btn.dataset.target);
+      if (!el) return;
+      try {
+        await navigator.clipboard.writeText(el.innerText.trim());
+        const prev = btn.textContent;
+        btn.textContent = 'Copied';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = prev; btn.classList.remove('copied'); }, 1500);
+      } catch (e) {
+        btn.textContent = 'Press ⌘C';
+      }
+    });
+  });
+</script>
+
+</body>
+</html>
